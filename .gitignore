@@ -1,0 +1,29 @@
+# Binaries
+/crawlterm
+crawlterm.exe
+*.exe
+bin/
+dist/
+
+# Test artifacts & coverage
+*.test
+*.out
+coverage.html
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor & IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Local environment / temporary files
+*.tmp
+*.log

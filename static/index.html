@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRAWL-TERM // Star Wars Terminal Emulator</title>
+  <link rel="stylesheet" href="vendor/xterm.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=JetBrains+Mono:wght@400;700;800&family=Newsreader:ital,opsz,wght@1,6..72,500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Starfield Canvas -->
+  <canvas id="starfield"></canvas>
+
+  <!-- Nebula Background Glow -->
+  <div class="nebula-overlay"></div>
+
+  <!-- Opening Prologue Sequence Overlay -->
+  <div id="intro-overlay" class="intro-overlay active">
+    <div id="intro-blue-text" class="intro-blue-text">
+      A long time ago in a terminal far, far away....
+    </div>
+    <div id="intro-logo" class="intro-logo">
+      <h1>CRAWL<br>TERM</h1>
+      <div class="intro-subtitle">EPISODE I: THE PERSPECTIVE SHELL</div>
+    </div>
+    <button id="skip-intro-btn" class="skip-btn">Skip Intro (Space / Click)</button>
+  </div>
+
+  <!-- 3D Perspective Terminal Viewport -->
+  <main id="viewport" class="viewport">
+    <div id="terminal-stage" class="terminal-stage">
+      <div id="terminal-container" class="terminal-container"></div>
+    </div>
+  </main>
+
+  <!-- Sci-Fi Floating HUD Controls -->
+  <header id="hud-bar" class="hud-bar">
+    <div class="hud-left">
+      <div class="hud-badge">
+        <span class="status-dot"></span>
+        <span class="hud-title">CRAWL-TERM</span>
+        <span class="hud-version">v1.0</span>
+      </div>
+      <div id="conn-status" class="conn-status">CONNECTING...</div>
+    </div>
+
+    <div class="hud-center">
+      <!-- Quick Perspective Presets -->
+      <div class="hud-group">
+        <label>MODE:</label>
+        <div class="hud-btn-toggle">
+          <button id="mode-crawl" class="hud-btn active" title="Cinematic Star Wars Crawl (18°)">Crawl</button>
+          <button id="mode-subtle" class="hud-btn" title="Subtle Tilt (8°)">Subtle</button>
+          <button id="mode-flat" class="hud-btn" title="Standard Flat Screen (0°)">Flat</button>
+        </div>
+      </div>
+
+      <!-- Crawl Speed Slider -->
+      <div class="hud-group">
+        <label for="speed-slider">SPEED: <span id="speed-val">0.8s</span></label>
+        <input type="range" id="speed-slider" min="0" max="2500" value="800" step="50" class="hud-slider" title="Adjust crawl speed (0 = Instant, 0.8s = Movie Crawl, 2.5s = Very Slow)">
+      </div>
+
+      <!-- Font Size Adjuster -->
+      <div class="hud-group">
+        <label>FONT:</label>
+        <button id="font-dec-btn" class="hud-btn icon-only" title="Decrease Font Size">−</button>
+        <span id="font-size-val" class="hud-val">22px</span>
+        <button id="font-inc-btn" class="hud-btn icon-only" title="Increase Font Size">+</button>
+      </div>
+
+      <!-- Theme Preset -->
+      <div class="hud-group">
+        <label for="theme-preset">THEME:</label>
+        <select id="theme-preset" class="hud-select">
+          <option value="classic">Gold</option>
+          <option value="sith">Sith</option>
+          <option value="hoth">Hoth</option>
+          <option value="yoda">Yoda</option>
+        </select>
+      </div>
+
+      <!-- Tilt Slider -->
+      <div class="hud-group">
+        <label for="tilt-slider">TILT: <span id="tilt-val">18°</span></label>
+        <input type="range" id="tilt-slider" min="0" max="32" value="18" step="1" class="hud-slider">
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <button id="sound-btn" class="hud-btn" title="Toggle Sound (Fanfare & Blaster Clicks)">
+        <span class="btn-icon">🔇</span> Sound
+      </button>
+      <button id="replay-btn" class="hud-btn" title="Replay Opening Sequence">
+        <span class="btn-icon">🎬</span> Intro
+      </button>
+      <button id="fullscreen-btn" class="hud-btn" title="Toggle Fullscreen">
+        <span class="btn-icon">⛶</span> Fullscreen
+      </button>
+      <button id="collapse-hud-btn" class="hud-btn icon-only" title="Toggle HUD Mini Mode">
+        <span class="btn-icon">▼</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Minimized HUD Opener -->
+  <button id="expand-hud-btn" class="expand-hud-btn hidden" title="Expand Control Deck">
+    ▲ CONTROLS
+  </button>
+
+  <!-- Scripts -->
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/xterm-addon-fit.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
