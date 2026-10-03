@@ -5,10 +5,12 @@ BINARY_NAME ?= crawlterm
 MAIN_PKG    ?= .
 GO          ?= go
 
+PORT        ?= 8765
+
 # Go build flags (optimizations, version metadata if needed)
 LDFLAGS ?= -s -w
 
-.PHONY: all build run test coverage fmt vet tidy clean install help
+.PHONY: all build run test coverage fmt vet tidy clean install kill help
 
 # Default target
 all: build
@@ -38,6 +40,16 @@ build:
 run: build
 	@echo "==> Running $(BINARY_NAME)..."
 	./$(BINARY_NAME)
+
+## Kill running crawlterm processes and free the port
+kill:
+	@echo "==> Stopping running $(BINARY_NAME) processes..."
+	@-pkill -f "$(BINARY_NAME)" 2>/dev/null && echo "==> Terminated $(BINARY_NAME) processes." || echo "==> No running $(BINARY_NAME) processes found."
+	@-if lsof -ti :$(PORT) >/dev/null 2>&1; then \
+		echo "==> Freeing port $(PORT)..."; \
+		kill -9 $$(lsof -ti :$(PORT)) 2>/dev/null || true; \
+	fi
+	@echo "==> Done."
 
 ## Run unit tests
 test:

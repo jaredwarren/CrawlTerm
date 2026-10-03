@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>CRAWL-TERM // Star Wars Terminal Emulator</title>
   <link rel="stylesheet" href="vendor/xterm.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=ots-fixed">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=JetBrains+Mono:wght@400;700;800&family=Newsreader:ital,opsz,wght@1,6..72,500&display=swap" rel="stylesheet">
@@ -42,7 +45,7 @@
       <div class="hud-badge">
         <span class="status-dot"></span>
         <span class="hud-title">CRAWL-TERM</span>
-        <span class="hud-version">v1.0</span>
+        <span class="hud-version">v2.1</span>
       </div>
       <div id="conn-status" class="conn-status">CONNECTING...</div>
     </div>
@@ -52,7 +55,7 @@
       <div class="hud-group">
         <label>MODE:</label>
         <div class="hud-btn-toggle">
-          <button id="mode-crawl" class="hud-btn active" title="Cinematic Star Wars Crawl (18°)">Crawl</button>
+          <button id="mode-crawl" class="hud-btn active" title="Cinematic Star Wars Crawl (24°)">Crawl</button>
           <button id="mode-subtle" class="hud-btn" title="Subtle Tilt (8°)">Subtle</button>
           <button id="mode-flat" class="hud-btn" title="Standard Flat Screen (0°)">Flat</button>
         </div>
@@ -60,8 +63,8 @@
 
       <!-- Crawl Speed Slider -->
       <div class="hud-group">
-        <label for="speed-slider">SPEED: <span id="speed-val">0.8s</span></label>
-        <input type="range" id="speed-slider" min="0" max="2500" value="800" step="50" class="hud-slider" title="Adjust crawl speed (0 = Instant, 0.8s = Movie Crawl, 2.5s = Very Slow)">
+        <label for="speed-slider">SPEED: <span id="speed-val">1.0s</span></label>
+        <input type="range" id="speed-slider" min="0" max="2500" value="1000" step="50" class="hud-slider" title="Adjust crawl speed (0 = Instant, 1.0s = Movie Crawl, 2.5s = Very Slow)">
       </div>
 
       <!-- Font Size Adjuster -->
@@ -85,8 +88,8 @@
 
       <!-- Tilt Slider -->
       <div class="hud-group">
-        <label for="tilt-slider">TILT: <span id="tilt-val">18°</span></label>
-        <input type="range" id="tilt-slider" min="0" max="32" value="18" step="1" class="hud-slider">
+        <label for="tilt-slider">TILT: <span id="tilt-val">24°</span></label>
+        <input type="range" id="tilt-slider" min="0" max="36" value="24" step="1" class="hud-slider">
       </div>
     </div>
 
@@ -114,6 +117,6 @@
   <!-- Scripts -->
   <script src="vendor/xterm.js"></script>
   <script src="vendor/xterm-addon-fit.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=ots-fixed"></script>
 </body>
 </html>

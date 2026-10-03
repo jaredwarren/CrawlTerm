@@ -1,3 +1,17 @@
+@font-face {
+  font-family: 'Star Jedi Hollow';
+  src: url('fonts/StarJediHollow-A4lL.ttf?v=ots-fixed') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@property --crawl-fade-height {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 :root {
   --primary-color: #FFE81F;
   --primary-glow: rgba(255, 232, 31, 0.45);
@@ -6,9 +20,14 @@
   --nebula-glow-1: rgba(18, 28, 58, 0.4);
   --nebula-glow-2: rgba(45, 12, 54, 0.25);
   
-  --tilt-angle: 18deg;
-  --perspective-depth: 480px;
+  --tilt-angle: 24deg;
+  --perspective-depth: 540px;
   --depth-offset: 0px;
+  /* Hidden ingress strip under the prompt. Incoming lines fade in smoothly
+     through this buffer as they glide up, leaving the active prompt 100% sharp. */
+  --row-height: 28px;
+  --crawl-buffer: 56px;
+  --crawl-fade-height: 0px;
   
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
   --font-title: 'Cinzel', serif;
@@ -94,33 +113,60 @@ html, body {
   position: relative;
   width: 90vw;
   max-width: 1400px;
-  height: 78vh;
+  height: 280vh;
   margin-bottom: 74px; /* Sits right above bottom HUD */
-  transform: rotateX(var(--tilt-angle, 18deg)) translateZ(var(--depth-offset, 0px));
+  transform: rotateX(var(--tilt-angle, 24deg)) translateZ(var(--depth-offset, 0px));
   transform-origin: 50% 100%;
   transition: transform 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
   overflow: hidden;
-  
-  /* Mask: Bottom 3.5% is 100% transparent to hide bottom line until it rolls in,
-     3.5% to 8% smooth fade-in, 8% to 60% solid readable body, top 40% recedes into stars */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+
+  /* Dynamic dual-mode mask:
+     - When typing/idle (--crawl-fade-height = 0px):
+       Reaches 100% solid (#000) right at var(--crawl-buffer). The active input prompt sits
+       at var(--crawl-buffer) and is 100% sharp, bright, and completely unobscured.
+     - When crawling (--crawl-fade-height > 0px, up to ~160px):
+       Extends the bottom gradient higher (~5-6 rows) for deep cinematic atmospheric cover.
+       Incoming lines start completely transparent below var(--crawl-buffer) - var(--row-height),
+       and fade in gradually through soft luminescence as they rise into the stars.
+     - Deep space render distance: text stays crisp and solid all the way up to 88% of the 3D plane,
+       receding naturally to the horizon near the top of the screen before dissolving into stars.
+  */
   mask-image: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0) 3.5%,
-    rgba(0, 0, 0, 1) 8%,
-    rgba(0, 0, 0, 1) 60%,
-    rgba(0, 0, 0, 0.5) 85%,
-    rgba(0, 0, 0, 0) 100%
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) calc(var(--crawl-buffer) - var(--row-height, 28px)),
+    rgba(0, 0, 0, 0.08) calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px) * 0.08),
+    rgba(0, 0, 0, 0.25) calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px) * 0.3),
+    rgba(0, 0, 0, 0.55) calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px) * 0.6),
+    rgba(0, 0, 0, 0.88) calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px) * 0.88),
+    #000 calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px)),
+    #000 88%,
+    rgba(0, 0, 0, 0.7) 94%,
+    rgba(0, 0, 0, 0.25) 98%,
+    transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0) 3.5%,
-    rgba(0, 0, 0, 1) 8%,
-    rgba(0, 0, 0, 1) 60%,
-    rgba(0, 0, 0, 0.5) 85%,
-    rgba(0, 0, 0, 0) 100%
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) calc(var(--crawl-buffer) - var(--row-height, 28px)),
+    rgba(0, 0, 0, 0.08) calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px) * 0.08),
+    rgba(0, 0, 0, 0.25) calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px) * 0.3),
+    rgba(0, 0, 0, 0.55) calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px) * 0.6),
+    rgba(0, 0, 0, 0.88) calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px) * 0.88),
+    #000 calc(var(--crawl-buffer) + var(--crawl-fade-height, 0px)),
+    #000 88%,
+    rgba(0, 0, 0, 0.7) 94%,
+    rgba(0, 0, 0, 0.25) 98%,
+    transparent 100%
   );
+}
+
+/* Subtle tilt mode override */
+body[data-mode="subtle"] .terminal-stage {
+  height: 92vh;
 }
 
 /* Flat mode transition override */
@@ -134,15 +180,20 @@ body[data-mode="flat"] .terminal-stage {
 
 .terminal-container {
   width: 100%;
-  height: 100%;
+  height: calc(100% - var(--crawl-buffer));
+  margin-bottom: var(--crawl-buffer);
   cursor: text;
-  overflow: hidden;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 /* xterm.js customization */
 .terminal {
-  padding: 10px 20px;
-  height: 100%;
+  padding: 0 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .xterm-viewport {
@@ -165,7 +216,7 @@ body[data-mode="flat"] .terminal-stage {
   letter-spacing: 0.8px;
 }
 
-.xterm-screen {
+.xterm {
   will-change: transform;
 }
 
@@ -223,14 +274,14 @@ body[data-mode="flat"] .terminal-stage {
 }
 
 .intro-logo h1 {
-  font-family: var(--font-title);
+  font-family: 'Star Jedi Hollow', var(--font-title), sans-serif;
   font-size: clamp(64px, 12vw, 150px);
-  font-weight: 900;
-  line-height: 0.9;
+  font-weight: normal;
+  line-height: 0.95;
   text-align: center;
-  color: #000;
-  -webkit-text-stroke: 4px var(--primary-color);
-  text-shadow: 0 0 25px var(--primary-glow);
+  color: var(--primary-color);
+  -webkit-text-stroke: 0;
+  text-shadow: 0 0 25px var(--primary-glow), 0 0 45px var(--primary-glow);
   letter-spacing: 4px;
 }
 

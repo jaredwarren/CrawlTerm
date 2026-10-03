@@ -167,12 +167,25 @@ class CrawlTerminalApp {
     this.fitAddon = null;
 
     this.fontSize = 22;
-    this.crawlSpeed = 800; // adjustable delay in ms (800ms = 0.8s authentic movie crawl)
+    this.crawlSpeed = 1000; // adjustable delay in ms (1000ms = 1.0s authentic movie crawl)
     this.crawlQueue = [];
     this.textBuffer = '';
     this.crawlTimer = null;
     this.bufferFlushTimer = null;
+    this.gliding = false;
+    this.glideFrom = 0;
+    this.glideTo = 0;
+    this.glideStart = 0;
+    this.glideDur = 0;
+    this.bufferPx = 48;
+    this.scrollRaf = 0;
+    this.scrollHoldUntil = 0;
     this.textDecoder = new TextDecoder();
+
+    this.isCrawling = false;
+    this.currentFade = 0;
+    this.targetFade = 0;
+    this.crawlFadeMax = 155;
 
     this.elements = {
       viewport: document.getElementById('viewport'),
@@ -219,6 +232,7 @@ class CrawlTerminalApp {
       letterSpacing: 0.8,
       allowTransparency: true,
       scrollback: 2000,
+      logLevel: 'off',
       theme: {
         background: 'transparent',
         foreground: '#FFE81F',
@@ -254,8 +268,12 @@ class CrawlTerminalApp {
 
     // Forward terminal input to backend
     this.term.onData(data => {
-      // If user types any key while the crawl is active, flush queue so they never lag
-      if (this.crawlQueue.length > 0) {
+      // Keystrokes skip the crawl and immediately collapse the bottom gradient
+      // so the prompt line and typing are 100% crisp and unmasked.
+      this.setCrawling(false);
+      this.currentFade = 0;
+      document.documentElement.style.setProperty('--crawl-fade-height', '0px');
+      if (this.crawlQueue.length > 0 || this.textBuffer.length > 0 || this.gliding) {
         this.flushCrawlQueue();
       }
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
@@ -304,8 +322,15 @@ class CrawlTerminalApp {
   }
 
   resizeTerminal() {
-    if (!this.term || !this.fitAddon) return;
+    this.gliding = false;
+    if (!this.term || !this.fitAddon) {
+      this._syncBuffer();
+      return;
+    }
     this.fitAddon.fit();
+    const prevBuffer = this.bufferPx;
+    this._syncBuffer();
+    if (this.bufferPx !== prevBuffer) this.fitAddon.fit();
     const dims = this.fitAddon.proposeDimensions();
     if (dims && dims.cols && dims.rows && this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({
@@ -314,6 +339,7 @@ class CrawlTerminalApp {
         rows: dims.rows
       }));
     }
+    this._setShift(0);
   }
 
   runIntroSequence() {
@@ -348,19 +374,43 @@ class CrawlTerminalApp {
     this.elements.introBlueText.classList.remove('show');
     this.elements.introLogo.classList.remove('animate');
     
+    this.flushCrawlQueue();
     this.resizeTerminal();
+    this.term.scrollToBottom();
     this.term.focus();
   }
 
   handleIncomingData(text) {
-    if (this.crawlSpeed === 0) {
-      this.term.write(text);
+    // Full-screen apps (vim, less) must not be line-paced.
+    if (this.term.buffer.active.type === 'alternate') {
+      this.flushCrawlQueue();
+      this._writeSync(text);
       return;
     }
 
-    // Direct echo for active user typing: if no newlines and no existing queue, write immediately
-    if (this.crawlQueue.length === 0 && !text.includes('\n') && !text.includes('\r')) {
-      this.term.write(text);
+    // While intro overlay is active, write directly so shell startup settles at the bottom
+    if (this.elements.introOverlay.classList.contains('active')) {
+      this._writeSync(text);
+      this.term.scrollToBottom();
+      return;
+    }
+
+    if (this.crawlSpeed === 0) {
+      this._writeSync(text);
+      return;
+    }
+
+    // Direct echo for active user typing: if no newlines and no existing queue, write immediately.
+    if (!this.gliding && this.crawlQueue.length === 0 && this.textBuffer.length === 0 && !text.includes('\n') && !text.includes('\r')) {
+      this._writeSync(text);
+      return;
+    }
+
+    // Screen clear sequences: reset queue and restore cursor to bottom
+    if (text.includes('\x1b[2J') || text.includes('\x1b[H\x1b[2J')) {
+      this.flushCrawlQueue();
+      this._writeSync(text);
+      this._writeSync('\r\n'.repeat(Math.max(0, this.term.rows - 1)));
       return;
     }
 
@@ -384,95 +434,221 @@ class CrawlTerminalApp {
     if (this.textBuffer.length > 0) {
       this.bufferFlushTimer = setTimeout(() => {
         if (this.textBuffer.length > 0) {
-          this.crawlQueue.push(this.textBuffer);
-          this.textBuffer = '';
-          this.startCrawlProcessor();
+          if (this.gliding || this.crawlQueue.length > 0) {
+            this._drainPassthrough();
+          } else {
+            this._writeSync(this.textBuffer);
+            this.textBuffer = '';
+          }
         }
-      }, 50);
+      }, 30);
     }
 
     this.startCrawlProcessor();
   }
 
   getRowHeight() {
-    const row = this.elements.container.querySelector('.xterm-rows > div');
-    if (row) {
-      const rect = row.getBoundingClientRect();
-      if (rect.height > 0) return rect.height;
+    const dims = this.term && this.term._core && this.term._core._renderService && this.term._core._renderService.dimensions;
+    const h = dims && dims.css && dims.css.cell && dims.css.cell.height;
+    if (h > 0) return h;
+    const lineHeight = (this.term && this.term.options.lineHeight) || 1.25;
+    return this.fontSize * lineHeight;
+  }
+
+  _writeSync(text) {
+    if (!text) return;
+    this.term._core.writeSync(text);
+  }
+
+  // Keep a blank ingress strip under the prompt so the bottom mask never covers the cursor,
+  // and so a new incoming row starts 100% transparent and glides smoothly up into view.
+  _syncBuffer() {
+    const tiltRaw = getComputedStyle(document.documentElement).getPropertyValue('--tilt-angle');
+    const tilt = parseFloat(tiltRaw) || 0;
+    const flat = document.body.getAttribute('data-mode') === 'flat' || tilt === 0;
+    const rowH = this.term ? this.getRowHeight() : 28;
+    this.bufferPx = flat ? 0 : Math.round(rowH * 2);
+    // When crawling, extend gradient higher (~5.5 rows) for deep cinematic atmospheric cover.
+    this.crawlFadeMax = flat ? 0 : Math.round(rowH * 5.5);
+    document.documentElement.style.setProperty('--row-height', `${rowH.toFixed(2)}px`);
+    document.documentElement.style.setProperty('--crawl-buffer', `${this.bufferPx}px`);
+    if (!this.isCrawling) {
+      document.documentElement.style.setProperty('--crawl-fade-height', '0px');
     }
-    return this.fontSize * 1.25;
+  }
+
+  setCrawling(active) {
+    if (this.isCrawling === active && this.targetFade === (active ? this.crawlFadeMax : 0)) return;
+    this.isCrawling = active;
+    this.targetFade = active ? this.crawlFadeMax : 0;
+    if (this.elements.stage) {
+      this.elements.stage.classList.toggle('is-crawling', active);
+    }
+    // When transitioning back to typing/idle, run a smooth collapse loop if the crawl loop stopped
+    if (!active && this.currentFade > 0 && !this.scrollRaf) {
+      this._startFadeCollapse();
+    }
+  }
+
+  _updateFadeTransition() {
+    if (Math.abs(this.currentFade - this.targetFade) < 0.5) {
+      this.currentFade = this.targetFade;
+    } else {
+      // Smooth interpolation: quick ramp up when output arrives, gentle decay when ready to type
+      const factor = this.isCrawling ? 0.16 : 0.12;
+      this.currentFade += (this.targetFade - this.currentFade) * factor;
+    }
+    document.documentElement.style.setProperty('--crawl-fade-height', `${this.currentFade.toFixed(1)}px`);
+  }
+
+  _startFadeCollapse() {
+    const step = () => {
+      this._updateFadeTransition();
+      if (this.currentFade > 0 && !this.isCrawling) {
+        requestAnimationFrame(step);
+      }
+    };
+    requestAnimationFrame(step);
+  }
+
+  _setShift(px) {
+    const el = this.term && this.term.element;
+    if (!el) return;
+    el.style.transition = 'none';
+    el.style.transform = px > 0.1 ? `translate3d(0, ${px.toFixed(2)}px, 0)` : '';
+  }
+
+  _rowDuration() {
+    let delay = this.crawlSpeed;
+    if (this.crawlQueue.length > 8) {
+      const factor = Math.min(0.8, (this.crawlQueue.length - 8) * 0.025);
+      delay = Math.max(40, Math.round(this.crawlSpeed * (1 - factor)));
+    }
+    return Math.max(16, delay);
+  }
+
+  _flushTermRender() {
+    const debouncer = this.term._core && this.term._core._renderService && this.term._core._renderService._renderDebouncer;
+    if (debouncer && debouncer._animationFrame && typeof debouncer._innerRefresh === 'function') {
+      debouncer._innerRefresh();
+    }
+  }
+
+  _drainPassthrough() {
+    while (this.crawlQueue.length > 0 && !this.crawlQueue[0].includes('\n')) {
+      this._writeSync(this.crawlQueue.shift());
+    }
+    // If no more newlines are queued, immediately append any trailing prompt in textBuffer
+    // to the row currently gliding so it glides in smoothly rather than popping in afterwards.
+    if (this.crawlQueue.length === 0 && this.textBuffer.length > 0 && !this.textBuffer.includes('\n')) {
+      this._writeSync(this.textBuffer);
+      this.textBuffer = '';
+      if (this.bufferFlushTimer) {
+        clearTimeout(this.bufferFlushTimer);
+        this.bufferFlushTimer = null;
+      }
+    }
   }
 
   startCrawlProcessor() {
-    if (this.crawlTimer) return;
-
-    const processStep = () => {
-      if (this.crawlQueue.length === 0) {
-        this.crawlTimer = null;
-        const screen = this.elements.container.querySelector('.xterm-screen');
-        if (screen) {
-          screen.style.transition = 'none';
-          screen.style.transform = 'none';
-        }
-        return;
-      }
-
-      const chunk = this.crawlQueue.shift();
-      const screen = this.elements.container.querySelector('.xterm-screen');
-      const rowHeight = this.getRowHeight();
-
-      if (this.crawlSpeed === 0) {
-        this.term.write(chunk);
-        this.flushCrawlQueue();
-        this.crawlTimer = null;
-        return;
-      }
-
-      // Base delay from speed slider (ms).
-      // If queue is long (> 8 lines), smoothly accelerate so large outputs don't stall
-      let delay = this.crawlSpeed;
-      if (this.crawlQueue.length > 8) {
-        const factor = Math.min(0.8, (this.crawlQueue.length - 8) * 0.025);
-        delay = Math.max(40, Math.round(this.crawlSpeed * (1 - factor)));
-      }
-
-      // Check if this chunk triggers a newline/row advance
-      const hasNewline = chunk.includes('\n');
-
-      if (hasNewline && screen && delay >= 60) {
-        // Zero-flicker smooth scroll sequence:
-        // 1. Offset screen down by rowHeight BEFORE writing so bottom line is hidden below the visible threshold
-        screen.style.transition = 'none';
-        screen.style.transform = `translateY(${rowHeight}px)`;
-
-        // 2. Write the new line to xterm buffer
-        this.term.write(chunk);
-        this.sound.playCrawlTick();
-
-        // 3. Force browser reflow to commit the offset
-        void screen.offsetHeight;
-
-        // 4. Smoothly glide upward to 0px on next frame
-        requestAnimationFrame(() => {
-          screen.style.transition = `transform ${delay}ms linear`;
-          screen.style.transform = 'translateY(0px)';
-        });
-      } else {
-        this.term.write(chunk);
-        this.sound.playCrawlTick();
-        if (screen) {
-          screen.style.transition = 'none';
-          screen.style.transform = 'none';
-        }
-      }
-
-      this.crawlTimer = setTimeout(processStep, delay);
+    this.setCrawling(true);
+    if (this.scrollRaf) return;
+    const loop = (now) => {
+      this.scrollRaf = requestAnimationFrame(loop);
+      this._stepCrawl(now);
     };
+    this.scrollRaf = requestAnimationFrame(loop);
+  }
 
-    processStep();
+  _stopCrawlLoop() {
+    if (this.scrollRaf) {
+      cancelAnimationFrame(this.scrollRaf);
+      this.scrollRaf = 0;
+    }
+    this.setCrawling(false);
+  }
+
+  _stepCrawl(now) {
+    this._updateFadeTransition();
+
+    if (this.crawlSpeed === 0) {
+      this.flushCrawlQueue();
+      return;
+    }
+
+    // Prompt redraws belong on the line that is currently moving.
+    this._drainPassthrough();
+
+    let carry = 0;
+    if (this.gliding) {
+      const elapsed = now - this.glideStart;
+      if (elapsed < this.glideDur) {
+        const t = elapsed / this.glideDur;
+        this._setShift(this.glideFrom + (this.glideTo - this.glideFrom) * t);
+        return;
+      }
+      carry = Math.min(this.glideDur * 0.5, elapsed - this.glideDur);
+      this.gliding = false;
+      this._setShift(this.glideTo);
+    }
+
+    if (now < this.scrollHoldUntil) {
+      if (this.crawlQueue.length === 0 && !this.textBuffer) this._stopCrawlLoop();
+      return;
+    }
+
+    if (this.crawlQueue.length === 0) {
+      this._stopCrawlLoop();
+      this._setShift(0);
+      return;
+    }
+
+    this._beginRowGlide(now, carry);
+  }
+
+  _beginRowGlide(now, carry = 0) {
+    const chunk = this.crawlQueue.shift();
+    if (!chunk) return;
+
+    const rowH = this.getRowHeight();
+    const before = this.term.buffer.active.baseY;
+    this._writeSync(chunk);
+    const scrolled = Math.max(0, this.term.buffer.active.baseY - before);
+    this._drainPassthrough();
+    this._flushTermRender();
+
+    if (scrolled <= 0 || rowH <= 0) {
+      if (chunk.includes('\n')) {
+        this.sound.playCrawlTick();
+        this.scrollHoldUntil = now + this._rowDuration();
+      }
+      this._setShift(0);
+      return;
+    }
+
+    // The new row is written into xterm DOM. Push it down into the transparent buffer strip
+    // (where the bottom gradient mask renders it 100% invisible), then smoothly glide it up.
+    const distance = scrolled * rowH;
+    const dur = this._rowDuration() * scrolled;
+    this.glideFrom = distance;
+    this.glideTo = 0;
+    this.glideStart = now - carry;
+    this.glideDur = dur;
+    this.gliding = true;
+
+    const initialT = carry > 0 ? Math.min(1, carry / dur) : 0;
+    this._setShift(distance * (1 - initialT));
+    this.sound.playCrawlTick();
   }
 
   flushCrawlQueue() {
+    this.setCrawling(false);
+    this.currentFade = 0;
+    document.documentElement.style.setProperty('--crawl-fade-height', '0px');
+    this._stopCrawlLoop();
+    this.scrollHoldUntil = 0;
+    this.gliding = false;
+    this._setShift(0);
     if (this.crawlTimer) {
       clearTimeout(this.crawlTimer);
       this.crawlTimer = null;
@@ -481,18 +657,10 @@ class CrawlTerminalApp {
       clearTimeout(this.bufferFlushTimer);
       this.bufferFlushTimer = null;
     }
-    const screen = this.elements.container.querySelector('.xterm-screen');
-    if (screen) {
-      screen.style.transition = 'none';
-      screen.style.transform = 'none';
-    }
-    while (this.crawlQueue.length > 0) {
-      this.term.write(this.crawlQueue.shift());
-    }
-    if (this.textBuffer.length > 0) {
-      this.term.write(this.textBuffer);
-      this.textBuffer = '';
-    }
+    const pending = this.crawlQueue.join('') + this.textBuffer;
+    this.crawlQueue.length = 0;
+    this.textBuffer = '';
+    this._writeSync(pending);
   }
 
   setSpeed(ms) {
@@ -556,8 +724,8 @@ class CrawlTerminalApp {
 
     if (mode === 'crawl') {
       this.elements.modeCrawl.classList.add('active');
-      this.elements.tiltSlider.value = 18;
-      this.setTilt(18);
+      this.elements.tiltSlider.value = 24;
+      this.setTilt(24);
     } else if (mode === 'subtle') {
       this.elements.modeSubtle.classList.add('active');
       this.elements.tiltSlider.value = 8;
@@ -618,9 +786,16 @@ class CrawlTerminalApp {
         this.elements.modeFlat.classList.add('active');
         this.elements.modeCrawl.classList.remove('active');
         this.elements.modeSubtle.classList.remove('active');
+      } else if (val <= 10) {
+        document.body.setAttribute('data-mode', 'subtle');
+        this.elements.modeSubtle.classList.add('active');
+        this.elements.modeCrawl.classList.remove('active');
+        this.elements.modeFlat.classList.remove('active');
       } else {
         document.body.removeAttribute('data-mode');
         this.elements.modeFlat.classList.remove('active');
+        this.elements.modeSubtle.classList.remove('active');
+        this.elements.modeCrawl.classList.add('active');
       }
     });
 

@@ -61,7 +61,19 @@ func main() {
 		}
 		staticHandler = http.FileServer(http.FS(sub))
 	}
-	http.Handle("/", staticHandler)
+	noCacheWrapper := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Strip conditional headers so http.FileServer never returns 304 Not Modified
+		r.Header.Del("If-Modified-Since")
+		r.Header.Del("If-None-Match")
+
+		// Force browsers and proxies to never store or reuse cached responses
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		w.Header().Set("Surrogate-Control", "no-store")
+		staticHandler.ServeHTTP(w, r)
+	})
+	http.Handle("/", noCacheWrapper)
 
 	// WebSocket handler for PTY
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

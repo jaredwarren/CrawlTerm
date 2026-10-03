@@ -25,13 +25,12 @@ A 3D perspective terminal emulator for macOS that renders your command line as a
 
 ### 1. Build & Run
 ```bash
-# Clone or navigate to directory
-cd /Users/jaredwarren/go/src/github.com/jaredwarren/crawl-term
+# Using Makefile
+make run      # Builds and starts crawlterm
+make kill     # Stops running processes and frees port 8765
 
-# Build executable
+# Or manually via Go
 go build -o crawlterm .
-
-# Run (opens http://127.0.0.1:8765 in your default browser)
 ./crawlterm
 ```
 
