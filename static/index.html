@@ -39,79 +39,161 @@
     </div>
   </main>
 
-  <!-- Sci-Fi Floating HUD Controls -->
-  <header id="hud-bar" class="hud-bar">
-    <div class="hud-left">
-      <div class="hud-badge">
-        <span class="status-dot"></span>
-        <span class="hud-title">CRAWL-TERM</span>
-        <span class="hud-version">v2.1</span>
-      </div>
-      <div id="conn-status" class="conn-status">CONNECTING...</div>
-    </div>
+  <!-- Star Wars Console Control Deck -->
+  <header id="hud-bar" class="hud-bar sw-console">
+    <!-- Outer Chassis Frame Corner Bolts -->
+    <div class="sw-bolt bolt-tl" aria-hidden="true"></div>
+    <div class="sw-bolt bolt-tr" aria-hidden="true"></div>
+    <div class="sw-bolt bolt-bl" aria-hidden="true"></div>
+    <div class="sw-bolt bolt-br" aria-hidden="true"></div>
 
-    <div class="hud-center">
-      <!-- Quick Perspective Presets -->
-      <div class="hud-group">
-        <label>MODE:</label>
-        <div class="hud-btn-toggle">
-          <button id="mode-crawl" class="hud-btn active" title="Cinematic Star Wars Crawl (24°)">Crawl</button>
-          <button id="mode-subtle" class="hud-btn" title="Subtle Tilt (8°)">Subtle</button>
-          <button id="mode-flat" class="hud-btn" title="Standard Flat Screen (0°)">Flat</button>
+    <!-- Pinstripe Circuit Traces Line -->
+    <div class="sw-pinstripe-trace" aria-hidden="true"></div>
+
+    <!-- MODULE 1: Comm & Status Unit (Left Wing) -->
+    <div class="sw-module sw-module-comm">
+      <!-- Concentric Metal Greeble Socket -->
+      <div class="sw-port-socket" title="Data Coupling Port" aria-hidden="true">
+        <div class="sw-port-ring"></div>
+        <div class="sw-port-core"></div>
+      </div>
+
+      <!-- Station Identification & Status Readout -->
+      <div class="sw-station-plate">
+        <div class="sw-brand-row">
+          <div class="sw-status-orb">
+            <span class="status-dot"></span>
+          </div>
+          <span class="hud-title">CRAWL-TERM</span>
+          <span class="sw-aurebesh-tag">⫽ COMM-77</span>
+        </div>
+        <div class="sw-screen-housing">
+          <div id="conn-status" class="conn-status">CONNECTING...</div>
         </div>
       </div>
+    </div>
 
-      <!-- Crawl Speed Slider -->
-      <div class="hud-group">
-        <label for="speed-slider">SPEED: <span id="speed-val">1.0s</span></label>
-        <input type="range" id="speed-slider" min="0" max="2500" value="1000" step="50" class="hud-slider" title="Adjust crawl speed (0 = Instant, 1.0s = Movie Crawl, 2.5s = Very Slow)">
+    <!-- MODULE 2: Nav / Perspective Deck -->
+    <div class="sw-module sw-module-nav">
+      <div class="sw-module-header">
+        <span class="sw-tech-code">NAV.01</span>
+        <span class="sw-module-name">PERSPECTIVE</span>
+      </div>
+      
+      <!-- 3-Button Raised Bezel Bank -->
+      <div class="sw-btn-bank">
+        <button id="mode-crawl" class="hud-btn sw-deck-btn active" title="Cinematic Star Wars Crawl (24°)">
+          <span class="sw-btn-indicator"></span>
+          <span class="sw-btn-label">CRAWL</span>
+        </button>
+        <button id="mode-subtle" class="hud-btn sw-deck-btn" title="Subtle Tilt (8°)">
+          <span class="sw-btn-indicator"></span>
+          <span class="sw-btn-label">SUBTLE</span>
+        </button>
+        <button id="mode-flat" class="hud-btn sw-deck-btn" title="Standard Flat Screen (0°)">
+          <span class="sw-btn-indicator"></span>
+          <span class="sw-btn-label">FLAT</span>
+        </button>
       </div>
 
-      <!-- Font Size Adjuster -->
-      <div class="hud-group">
-        <label>FONT:</label>
-        <button id="font-dec-btn" class="hud-btn icon-only" title="Decrease Font Size">−</button>
-        <span id="font-size-val" class="hud-val">22px</span>
-        <button id="font-inc-btn" class="hud-btn icon-only" title="Increase Font Size">+</button>
-      </div>
-
-      <!-- Theme Preset -->
-      <div class="hud-group">
-        <label for="theme-preset">THEME:</label>
-        <select id="theme-preset" class="hud-select">
-          <option value="classic">Gold</option>
-          <option value="sith">Sith</option>
-          <option value="hoth">Hoth</option>
-          <option value="yoda">Yoda</option>
-        </select>
-      </div>
-
-      <!-- Tilt Slider -->
-      <div class="hud-group">
-        <label for="tilt-slider">TILT: <span id="tilt-val">24°</span></label>
-        <input type="range" id="tilt-slider" min="0" max="36" value="24" step="1" class="hud-slider">
+      <!-- Pitch / Tilt Slider Lever -->
+      <div class="sw-slider-rack">
+        <div class="sw-rack-label">
+          <span>PITCH</span>
+          <span id="tilt-val" class="sw-readout">24°</span>
+        </div>
+        <input type="range" id="tilt-slider" min="0" max="36" value="24" step="1" class="hud-slider sw-console-slider">
       </div>
     </div>
 
-    <div class="hud-right">
-      <button id="sound-btn" class="hud-btn" title="Toggle Sound (Fanfare & Blaster Clicks)">
-        <span class="btn-icon">🔇</span> Sound
-      </button>
-      <button id="replay-btn" class="hud-btn" title="Replay Opening Sequence">
-        <span class="btn-icon">🎬</span> Intro
-      </button>
-      <button id="fullscreen-btn" class="hud-btn" title="Toggle Fullscreen">
-        <span class="btn-icon">⛶</span> Fullscreen
-      </button>
-      <button id="collapse-hud-btn" class="hud-btn icon-only" title="Toggle HUD Mini Mode">
-        <span class="btn-icon">▼</span>
-      </button>
+    <!-- MODULE 3: Warp & Heatsink Deck -->
+    <div class="sw-module sw-module-warp">
+      <div class="sw-module-header">
+        <span class="sw-tech-code">CHRN.02</span>
+        <span class="sw-module-name">WARP RATE</span>
+      </div>
+
+      <div class="sw-slider-rack">
+        <div class="sw-rack-label">
+          <span>SPEED</span>
+          <span id="speed-val" class="sw-readout">1.0s</span>
+        </div>
+        <input type="range" id="speed-slider" min="0" max="2500" value="1000" step="50" class="hud-slider sw-console-slider" title="Adjust crawl speed (0 = Instant, 1.0s = Movie Crawl, 2.5s = Very Slow)">
+      </div>
+
+      <!-- Glowing Heatsink Radiator Slats Greeble -->
+      <div class="sw-heatsink" title="Thermal Radiator Slats" aria-hidden="true">
+        <span class="sw-slat"></span>
+        <span class="sw-slat"></span>
+        <span class="sw-slat"></span>
+        <span class="sw-slat"></span>
+        <span class="sw-slat"></span>
+        <span class="sw-slat"></span>
+      </div>
+    </div>
+
+    <!-- MODULE 4: Optics & Spectrum Matrix -->
+    <div class="sw-module sw-module-optics">
+      <div class="sw-module-header">
+        <span class="sw-tech-code">OPT.03</span>
+        <span class="sw-module-name">OPTICS & KYBER</span>
+      </div>
+
+      <div class="sw-optics-row">
+        <!-- Font Stepper Buttons -->
+        <div class="sw-stepper-housing">
+          <button id="font-dec-btn" class="hud-btn sw-step-btn" title="Decrease Font Size">−</button>
+          <span id="font-size-val" class="sw-readout sw-font-readout">22px</span>
+          <button id="font-inc-btn" class="hud-btn sw-step-btn" title="Increase Font Size">+</button>
+        </div>
+
+        <!-- Kyber Theme Selector -->
+        <div class="sw-select-bezel">
+          <select id="theme-preset" class="hud-select sw-console-select" title="Kyber Crystal Spectrum">
+            <option value="classic">GOLD // TATOOINE</option>
+            <option value="sith">SITH // CRIMSON</option>
+            <option value="hoth">HOTH // ION BLUE</option>
+            <option value="yoda">YODA // DAGOBAH</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODULE 5: Tactical Aux & Mechanical Stowing Latch -->
+    <div class="sw-module sw-module-aux">
+      <div class="sw-aux-grid">
+        <!-- Stacked Dual Hexagonal (Honeycomb) Push Buttons -->
+        <div class="sw-hex-stack">
+          <button id="sound-btn" class="hud-btn sw-hex-btn" title="Toggle Audio Comm (Blaster / Fanfare)">
+            <span class="btn-icon">🔇</span>
+            <span class="sw-hex-text">AUDIO</span>
+          </button>
+          <button id="replay-btn" class="hud-btn sw-hex-btn" title="Replay Opening Sequence">
+            <span class="btn-icon">🎬</span>
+            <span class="sw-hex-text">HOLO</span>
+          </button>
+        </div>
+
+        <!-- Tactical Screen Actions -->
+        <div class="sw-action-stack">
+          <button id="fullscreen-btn" class="hud-btn sw-rect-action-btn" title="Toggle Fullscreen">
+            <span class="btn-icon">⛶</span>
+            <span class="sw-action-label">TACTICAL</span>
+          </button>
+          <button id="collapse-hud-btn" class="hud-btn sw-latch-action-btn" title="Stow Console Deck">
+            <span class="sw-hazard-stripes"></span>
+            <span class="sw-action-label">▼ STOW</span>
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
-  <!-- Minimized HUD Opener -->
-  <button id="expand-hud-btn" class="expand-hud-btn hidden" title="Expand Control Deck">
-    ▲ CONTROLS
+  <!-- Minimized HUD Opener / Deploy Latch -->
+  <button id="expand-hud-btn" class="expand-hud-btn sw-deploy-latch hidden" title="Deploy Control Deck">
+    <span class="sw-hazard-stripes mini"></span>
+    <span>▲ DEPLOY CONSOLE</span>
+    <span class="sw-hazard-stripes mini"></span>
   </button>
 
   <!-- Scripts -->

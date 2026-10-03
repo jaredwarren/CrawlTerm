@@ -754,9 +754,18 @@ class CrawlTerminalApp {
     });
 
     // Perspective Mode Buttons
-    this.elements.modeCrawl.addEventListener('click', () => this.setMode('crawl'));
-    this.elements.modeSubtle.addEventListener('click', () => this.setMode('subtle'));
-    this.elements.modeFlat.addEventListener('click', () => this.setMode('flat'));
+    this.elements.modeCrawl.addEventListener('click', () => {
+      this.sound.playKeyClick();
+      this.setMode('crawl');
+    });
+    this.elements.modeSubtle.addEventListener('click', () => {
+      this.sound.playKeyClick();
+      this.setMode('subtle');
+    });
+    this.elements.modeFlat.addEventListener('click', () => {
+      this.sound.playKeyClick();
+      this.setMode('flat');
+    });
 
     // Crawl Speed Slider
     this.elements.speedSlider.addEventListener('input', (e) => {
@@ -764,8 +773,14 @@ class CrawlTerminalApp {
     });
 
     // Font Size Buttons
-    this.elements.fontDecBtn.addEventListener('click', () => this.setFontSize(-2));
-    this.elements.fontIncBtn.addEventListener('click', () => this.setFontSize(2));
+    this.elements.fontDecBtn.addEventListener('click', () => {
+      this.sound.playKeyClick();
+      this.setFontSize(-2);
+    });
+    this.elements.fontIncBtn.addEventListener('click', () => {
+      this.sound.playKeyClick();
+      this.setFontSize(2);
+    });
 
     // Intro Skip
     this.elements.skipIntroBtn.addEventListener('click', () => this.endIntro());
@@ -801,23 +816,29 @@ class CrawlTerminalApp {
 
     // Theme selector
     this.elements.themePreset.addEventListener('change', (e) => {
+      this.sound.playKeyClick();
       this.setTheme(e.target.value);
     });
 
     // Sound toggle
     this.elements.soundBtn.addEventListener('click', () => {
       const active = this.sound.toggle();
+      this.sound.playKeyClick();
       this.elements.soundBtn.classList.toggle('active', active);
-      this.elements.soundBtn.innerHTML = active ? '<span class="btn-icon">🔊</span> Sound' : '<span class="btn-icon">🔇</span> Sound';
+      this.elements.soundBtn.innerHTML = active ? 
+        '<span class="btn-icon">🔊</span><span class="sw-hex-text">AUDIO</span>' : 
+        '<span class="btn-icon">🔇</span><span class="sw-hex-text">AUDIO</span>';
     });
 
     // Replay intro
     this.elements.replayBtn.addEventListener('click', () => {
+      this.sound.playKeyClick();
       this.runIntroSequence();
     });
 
     // Fullscreen toggle
     this.elements.fullscreenBtn.addEventListener('click', () => {
+      this.sound.playKeyClick();
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
       } else {
@@ -827,11 +848,13 @@ class CrawlTerminalApp {
 
     // Collapse / Expand HUD
     this.elements.collapseHudBtn.addEventListener('click', () => {
+      this.sound.playKeyClick();
       this.elements.hudBar.classList.add('collapsed');
       this.elements.expandHudBtn.classList.remove('hidden');
     });
 
     this.elements.expandHudBtn.addEventListener('click', () => {
+      this.sound.playKeyClick();
       this.elements.hudBar.classList.remove('collapsed');
       this.elements.expandHudBtn.classList.add('hidden');
     });
