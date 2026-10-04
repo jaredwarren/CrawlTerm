@@ -31,6 +31,3 @@ coverage.out
 .env.*
 *.tmp
 *.log
-
-# Local reference images (kept out of the public tree)
-*.webp
