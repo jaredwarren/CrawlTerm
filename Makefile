@@ -2,15 +2,17 @@
 # Makefile
 
 BINARY_NAME ?= crawlterm
+APP_NAME    ?= CrawlTerm.app
 MAIN_PKG    ?= .
 GO          ?= go
 
 PORT        ?= 8765
 
-# Go build flags (optimizations, version metadata if needed)
-LDFLAGS ?= -s -w
+# Native macOS Cocoa + WebKit desktop window.
+CGO_ENABLED ?= 1
+LDFLAGS     ?= -s -w
 
-.PHONY: all build run test coverage fmt vet tidy clean install kill help
+.PHONY: all build run app update test coverage fmt vet tidy clean install kill help
 
 # Default target
 all: build
@@ -30,26 +32,37 @@ help:
 	} \
 	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
-## Compile the binary
+## Compile the binary (CGO + Cocoa/WebKit on macOS)
 build:
 	@echo "==> Building $(BINARY_NAME)..."
-	$(GO) build -ldflags="$(LDFLAGS)" -o $(BINARY_NAME) $(MAIN_PKG)
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) build -ldflags="$(LDFLAGS)" -o $(BINARY_NAME) $(MAIN_PKG)
 	@echo "==> Built: ./$(BINARY_NAME)"
 
-## Build and run crawl-term
+## Build and run as a native desktop app
 run: build
 	@echo "==> Running $(BINARY_NAME)..."
-	./$(BINARY_NAME)
+	./$(BINARY_NAME) -port $(PORT)
+
+## Build CrawlTerm.app macOS application bundle
+app:
+	@./scripts/build-app.sh
+
+## Install/update CrawlTerm.app in /Applications
+update: app
+	@echo "Installing/updating /Applications/$(APP_NAME)..."
+	@rm -rf /Applications/$(APP_NAME)
+	@cp -R $(APP_NAME) /Applications/
+	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/$(APP_NAME) >/dev/null 2>&1 || true
+	@echo "==> /Applications/$(APP_NAME) updated. Launch with: open -a CrawlTerm"
 
 ## Kill running crawlterm processes and free the port
 kill:
-	@echo "==> Stopping running $(BINARY_NAME) processes..."
-	@-pkill -f "$(BINARY_NAME)" 2>/dev/null && echo "==> Terminated $(BINARY_NAME) processes." || echo "==> No running $(BINARY_NAME) processes found."
-	@-if lsof -ti :$(PORT) >/dev/null 2>&1; then \
-		echo "==> Freeing port $(PORT)..."; \
-		kill -9 $$(lsof -ti :$(PORT)) 2>/dev/null || true; \
-	fi
-	@echo "==> Done."
+	@PIDS=$$(pgrep -f 'CrawlTerm\.app/Contents/MacOS/CrawlTerm|/crawlterm$$|^\./crawlterm' 2>/dev/null || true); \
+	PORT_PIDS=$$(lsof -tiTCP:$(PORT) -sTCP:LISTEN 2>/dev/null || true); \
+	ALL=$$(echo "$$PIDS $$PORT_PIDS" | tr ' ' '\n' | sort -u | grep -v '^$$' || true); \
+	if [ -n "$$ALL" ]; then echo "Stopping: $$ALL"; kill $$ALL 2>/dev/null || true; sleep 1; \
+	  for p in $$ALL; do kill -0 $$p 2>/dev/null && kill -9 $$p 2>/dev/null || true; done; \
+	  echo "Stopped."; else echo "No CrawlTerm process found on port $(PORT)."; fi
 
 ## Run unit tests
 test:
@@ -81,10 +94,11 @@ tidy:
 ## Install binary into GOPATH/bin
 install:
 	@echo "==> Installing to GOPATH/bin..."
-	$(GO) install -ldflags="$(LDFLAGS)" $(MAIN_PKG)
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) install -ldflags="$(LDFLAGS)" $(MAIN_PKG)
 
-## Remove compiled binary and test artifacts
+## Remove compiled binary, app bundle, and test artifacts
 clean:
 	@echo "==> Cleaning build artifacts..."
 	rm -f $(BINARY_NAME) $(BINARY_NAME).exe coverage.out coverage.html
+	rm -rf $(APP_NAME)
 	@echo "==> Done."

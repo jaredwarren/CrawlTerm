@@ -226,6 +226,12 @@ body[data-mode="flat"] .terminal-stage {
 }
 
 /* Prologue / Intro Sequence */
+/* Hide heavy terminal/HUD layers while the intro owns the screen. */
+body.intro-active .viewport,
+body.intro-active .hud-bar {
+  visibility: hidden;
+}
+
 .intro-overlay {
   position: fixed;
   inset: 0;
@@ -237,12 +243,21 @@ body[data-mode="flat"] .terminal-stage {
   flex-direction: column;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.8s ease;
+  transition: opacity 0.9s ease, background-color 0.5s ease;
+  overflow: hidden;
 }
 
 .intro-overlay.active {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Transparent scrim + modest perspective: stars show through, but Z stays
+   in a range WKWebView won't cull (unlike the old -800px dive). */
+.intro-overlay.logo-phase {
+  background: transparent;
+  perspective: 1200px;
+  perspective-origin: 50% 42%;
 }
 
 .intro-blue-text {
@@ -253,14 +268,14 @@ body[data-mode="flat"] .terminal-stage {
   max-width: 800px;
   line-height: 1.4;
   opacity: 0;
-  transform: translateY(10px);
+  transform: translate3d(0, 10px, 0);
   transition: opacity 1.2s ease, transform 1.2s ease;
   position: absolute;
 }
 
 .intro-blue-text.show {
   opacity: 1;
-  transform: translateY(0);
+  transform: translate3d(0, 0, 0);
 }
 
 .intro-logo {
@@ -269,8 +284,12 @@ body[data-mode="flat"] .terminal-stage {
   flex-direction: column;
   align-items: center;
   opacity: 0;
-  transform: scale(2) translateZ(0);
+  /* translate3d keeps this on a Core Animation layer in WKWebView. */
+  transform: translate3d(0, 0, 0) scale3d(1.75, 1.75, 1);
   pointer-events: none;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  contain: layout style;
 }
 
 .intro-logo h1 {
@@ -281,8 +300,8 @@ body[data-mode="flat"] .terminal-stage {
   text-align: center;
   color: var(--primary-color);
   -webkit-text-stroke: 0;
-  text-shadow: 0 0 25px var(--primary-glow), 0 0 45px var(--primary-glow);
-  letter-spacing: 4px;
+  text-shadow: 0 0 28px var(--primary-glow);
+  letter-spacing: -4px;
 }
 
 .intro-subtitle {
@@ -295,21 +314,22 @@ body[data-mode="flat"] .terminal-stage {
 }
 
 .intro-logo.animate {
-  animation: logoRecede 5.5s cubic-bezier(0.1, 0.4, 0.5, 1) forwards;
+  /* Few keyframes + transform/opacity only → smooth CA interpolation. */
+  animation: logoRecede 5.5s cubic-bezier(0.2, 0.55, 0.25, 1) forwards;
 }
 
 @keyframes logoRecede {
   0% {
     opacity: 1;
-    transform: scale(1.6) translateZ(100px);
+    transform: translate3d(0, 0, 0) scale3d(1.75, 1.75, 1);
   }
-  70% {
+  78% {
     opacity: 1;
-    transform: scale(0.3) translateZ(-400px);
+    transform: translate3d(0, 0, -200px) scale3d(0.42, 0.42, 1);
   }
   100% {
     opacity: 0;
-    transform: scale(0.02) translateZ(-800px);
+    transform: translate3d(0, 0, -280px) scale3d(0.3, 0.3, 1);
   }
 }
 
@@ -549,7 +569,7 @@ body[data-mode="flat"] .terminal-stage {
   font-family: 'Star Jedi Hollow', var(--font-title), sans-serif;
   font-size: 15px;
   font-weight: normal;
-  letter-spacing: 1.5px;
+  letter-spacing: 0px;
   line-height: 1;
   color: var(--primary-color);
   -webkit-text-stroke: 0.25px var(--primary-color);

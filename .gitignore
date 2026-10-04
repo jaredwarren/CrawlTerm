@@ -1,14 +1,16 @@
-# Binaries
+# Binaries & app bundle
 /crawlterm
 crawlterm.exe
 *.exe
 bin/
 dist/
+CrawlTerm.app/
 
 # Test artifacts & coverage
 *.test
 *.out
 coverage.html
+coverage.out
 
 # macOS system files
 .DS_Store
@@ -25,7 +27,10 @@ coverage.html
 .settings/
 
 # Local environment / temporary files
+.env
+.env.*
 *.tmp
 *.log
 
+# Local reference images (kept out of the public tree)
 *.webp

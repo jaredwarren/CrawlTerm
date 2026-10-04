@@ -6,17 +6,20 @@ class Starfield {
     this.ctx = canvas.getContext('2d');
     this.stars = [];
     this.numStars = 220;
+    this.running = true;
+    this.raf = 0;
     this.resize();
     this.init();
-    
+
     window.addEventListener('resize', () => this.resize());
     this.animate = this.animate.bind(this);
-    requestAnimationFrame(this.animate);
+    this.raf = requestAnimationFrame(this.animate);
   }
 
   resize() {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
+    if (!this.running) this.drawFrame(performance.now());
   }
 
   init() {
@@ -34,26 +37,46 @@ class Starfield {
     }
   }
 
-  animate(time) {
+  pause() {
+    this.running = false;
+    if (this.raf) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    }
+  }
+
+  resume() {
+    if (this.running) return;
+    this.running = true;
+    this.raf = requestAnimationFrame(this.animate);
+  }
+
+  drawFrame(time) {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
+
     for (const star of this.stars) {
-      star.y += star.speed;
-      if (star.y > this.canvas.height) {
-        star.y = 0;
-        star.x = Math.random() * this.canvas.width;
+      if (this.running) {
+        star.y += star.speed;
+        if (star.y > this.canvas.height) {
+          star.y = 0;
+          star.x = Math.random() * this.canvas.width;
+        }
       }
 
       const twinkle = Math.sin(time * star.twinkleRate + star.twinkleOffset) * 0.3 + 0.7;
       const alpha = Math.min(1, Math.max(0.1, star.brightness * twinkle));
-      
+
       this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
       this.ctx.beginPath();
       this.ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
       this.ctx.fill();
     }
+  }
 
-    requestAnimationFrame(this.animate);
+  animate(time) {
+    if (!this.running) return;
+    this.drawFrame(time);
+    this.raf = requestAnimationFrame(this.animate);
   }
 }
 
@@ -187,6 +210,12 @@ class CrawlTerminalApp {
     this.targetFade = 0;
     this.crawlFadeMax = 155;
 
+    // Local line buffer for intercepting "exec 66" / "exec order 66"
+    this.inputLine = '';
+    this.order66Prompt = false;
+    this.order66SuppressEcho = false;
+    this.quitting = false;
+
     this.elements = {
       viewport: document.getElementById('viewport'),
       stage: document.getElementById('terminal-stage'),
@@ -266,7 +295,7 @@ class CrawlTerminalApp {
       this.term.focus();
     }, 100);
 
-    // Forward terminal input to backend
+    // Forward terminal input to backend (with Order 66 intercept)
     this.term.onData(data => {
       // Keystrokes skip the crawl and immediately collapse the bottom gradient
       // so the prompt line and typing are 100% crisp and unmasked.
@@ -276,11 +305,128 @@ class CrawlTerminalApp {
       if (this.crawlQueue.length > 0 || this.textBuffer.length > 0 || this.gliding) {
         this.flushCrawlQueue();
       }
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        this.socket.send(data);
-      }
+      this.handleTermInput(data);
       this.sound.playKeyClick();
     });
+  }
+
+  handleTermInput(data) {
+    if (this.quitting) return;
+
+    if (this.order66Prompt) {
+      this.handleOrder66Confirm(data);
+      return;
+    }
+
+    // Don't try to parse input inside full-screen apps.
+    if (this.term.buffer.active.type === 'alternate') {
+      this.inputLine = '';
+      this.sendToShell(data);
+      return;
+    }
+
+    if (data === '\r') {
+      const line = this.inputLine.trim().replace(/\s+/g, ' ');
+      this.inputLine = '';
+      if (/^exec (order )?66$/i.test(line)) {
+        this.beginOrder66();
+        return;
+      }
+      this.sendToShell(data);
+      return;
+    }
+
+    if (data === '\x7f' || data === '\b') {
+      this.inputLine = this.inputLine.slice(0, -1);
+      this.sendToShell(data);
+      return;
+    }
+
+    if (data === '\x15' || data === '\x03') {
+      // Ctrl+U / Ctrl+C clear the local line buffer
+      this.inputLine = '';
+      this.sendToShell(data);
+      return;
+    }
+
+    if (data.startsWith('\x1b')) {
+      // Arrow keys / history — abandon simple line tracking
+      this.inputLine = '';
+      this.sendToShell(data);
+      return;
+    }
+
+    if (data.length === 1 && data >= ' ') {
+      this.inputLine += data;
+      this.sendToShell(data);
+      return;
+    }
+
+    // Paste or other multi-byte input
+    if (data.includes('\r')) {
+      const parts = data.split('\r');
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i]) {
+          this.inputLine += parts[i];
+          this.sendToShell(parts[i]);
+        }
+        if (i < parts.length - 1) {
+          this.handleTermInput('\r');
+        }
+      }
+      return;
+    }
+
+    this.inputLine += data;
+    this.sendToShell(data);
+  }
+
+  sendToShell(data) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(data);
+    }
+  }
+
+  beginOrder66() {
+    // Shell Ctrl+U echo races with a local write and truncates the prompt in
+    // xterm (often leaving "Execute ord|"). Suppress PTY output until we paint.
+    this.order66Prompt = true;
+    this.order66SuppressEcho = true;
+    this.flushCrawlQueue();
+    this.sendToShell('\x15'); // clear the already-typed "exec 66" from the shell
+
+    setTimeout(() => {
+      this.flushCrawlQueue();
+      this.term.write('\r\n\x1b[33mExecute order 66?\x1b[0m [y/N] ');
+      this.term.scrollToBottom();
+    }, 120);
+  }
+
+  handleOrder66Confirm(data) {
+    const key = data.toLowerCase();
+    if (key === 'y') {
+      this.order66Prompt = false;
+      this.quitting = true;
+      this.term.write('y\r\n');
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify({ type: 'quit' }));
+      } else {
+        window.close();
+      }
+      return;
+    }
+
+    if (key === 'n' || data === '\r' || data === '\x03') {
+      this.order66Prompt = false;
+      if (key === 'n') this.term.write('n');
+      this.term.write('\r\n\x1b[32mOrder 66 aborted.\x1b[0m\r\n');
+      // Nudge the shell for a fresh prompt after the local dialogue.
+      this.sendToShell('\r');
+      setTimeout(() => {
+        this.order66SuppressEcho = false;
+      }, 150);
+    }
+    // Ignore other keys while waiting for y/n
   }
 
   connectWebSocket() {
@@ -310,6 +456,11 @@ class CrawlTerminalApp {
     };
 
     this.socket.onclose = () => {
+      if (this.quitting) {
+        this.elements.connStatus.textContent = 'ORDER 66';
+        this.elements.connStatus.style.color = '#FF3344';
+        return;
+      }
       this.elements.connStatus.textContent = 'DISCONNECTED';
       this.elements.connStatus.style.color = '#FF3344';
       this.term.write('\r\n\x1b[31m[Session terminated. Reconnecting in 3s...]\x1b[0m\r\n');
@@ -344,24 +495,37 @@ class CrawlTerminalApp {
 
   runIntroSequence() {
     const { introOverlay, introBlueText, introLogo } = this.elements;
+    clearTimeout(this.introTimer1);
+    clearTimeout(this.introTimer2);
+    clearTimeout(this.introTimer3);
+    clearTimeout(this.introTimer4);
+    this.introEnding = false;
+
+    document.body.classList.add('intro-active');
     introOverlay.classList.add('active');
+    introOverlay.classList.remove('logo-phase');
     introBlueText.classList.add('show');
     introLogo.classList.remove('animate');
+    // Force a style flush so re-adding .animate always restarts the keyframes
+    // (important when replaying the intro in WKWebView).
+    void introLogo.offsetWidth;
 
     // 1. Blue prologue text
     this.introTimer1 = setTimeout(() => {
       introBlueText.classList.remove('show');
-      
-      // 2. Logo fanfare
+
+      // 2. Logo fanfare — freeze the canvas stars so Core Animation owns the frame
       this.introTimer2 = setTimeout(() => {
+        this.starfield.pause();
+        introOverlay.classList.add('logo-phase');
         introLogo.classList.add('animate');
         this.sound.playFanfare();
 
-        // 3. Fade into interactive terminal
+        // 3. Crossfade into the terminal slightly before the logo hits opacity 0
         this.introTimer3 = setTimeout(() => {
           this.endIntro();
-        }, 5500);
-      }, 800);
+        }, 5000);
+      }, 900);
     }, 2800);
   }
 
@@ -369,18 +533,39 @@ class CrawlTerminalApp {
     clearTimeout(this.introTimer1);
     clearTimeout(this.introTimer2);
     clearTimeout(this.introTimer3);
+    clearTimeout(this.introTimer4);
 
-    this.elements.introOverlay.classList.remove('active');
-    this.elements.introBlueText.classList.remove('show');
-    this.elements.introLogo.classList.remove('animate');
-    
-    this.flushCrawlQueue();
-    this.resizeTerminal();
-    this.term.scrollToBottom();
-    this.term.focus();
+    if (this.introEnding) return;
+    this.introEnding = true;
+
+    const { introOverlay, introBlueText, introLogo } = this.elements;
+    introOverlay.classList.remove('active');
+    introOverlay.classList.add('logo-phase'); // keep scrim clear while fading out
+    this.starfield.resume();
+    document.body.classList.remove('intro-active');
+
+    // Let the overlay opacity transition finish before ripping down logo
+    // classes — removing .animate mid-flight snaps the title away in WKWebView.
+    this.introTimer4 = setTimeout(() => {
+      introOverlay.classList.remove('logo-phase');
+      introBlueText.classList.remove('show');
+      introLogo.classList.remove('animate');
+      this.introEnding = false;
+
+      this.flushCrawlQueue();
+      this.resizeTerminal();
+      this.term.scrollToBottom();
+      this.term.focus();
+    }, 900);
   }
 
   handleIncomingData(text) {
+    // Drop shell echo while Order 66 is clearing/prompting so it can't
+    // overwrite our locally written confirmation line.
+    if (this.order66SuppressEcho || this.order66Prompt) {
+      return;
+    }
+
     // Full-screen apps (vim, less) must not be line-paced.
     if (this.term.buffer.active.type === 'alternate') {
       this.flushCrawlQueue();
