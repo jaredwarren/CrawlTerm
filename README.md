@@ -8,6 +8,10 @@ A local terminal emulator that renders your shell output as a receding perspecti
 ![Version](https://img.shields.io/badge/version-1.0.0-FFE81F?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
+<p align="center">
+  <img src="logo.png" alt="Crawl Term — Episode I: The Perspective Shell" width="480">
+</p>
+
 ![Crawl-Term screenshot](ScreenShot.png)
 
 ## Features
